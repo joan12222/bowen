@@ -1,0 +1,62 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# env files (contains secrets!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+
+# temp files
+_docx_tmp/
+tasks/
+_tmp.zip
+aaa.gzip
+doc_extracted.xml
+tsconfig.tsbuildinfo
+
+# uploads
+public/uploads/
+
+# source documents (pdfs/docx in root)
+*.pdf
+*.docx
+*.zip
+*.gzip
+
+# test/temp files in root
+*.jpg
+*.png
+*.txt
+*.xml
+
+# misc
+.claude/
