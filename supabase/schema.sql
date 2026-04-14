@@ -92,6 +92,27 @@ CREATE TABLE shici_cards (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- shici_words table（实词300主表）
+CREATE TABLE shici_words (
+  id          INT PRIMARY KEY,
+  word        TEXT NOT NULL,
+  pinyin      TEXT NOT NULL,
+  char_type   TEXT,
+  origin      TEXT,
+  base_meaning TEXT NOT NULL
+);
+
+-- shici_senses table（义项表，一对多）
+CREATE TABLE shici_senses (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  word_id     INT REFERENCES shici_words(id) ON DELETE CASCADE,
+  pos         TEXT NOT NULL,
+  meaning     TEXT NOT NULL,
+  sense_order INT NOT NULL,
+  examples    JSONB NOT NULL DEFAULT '[]'
+  -- 格式：[{"sentence": "...", "source": "...", "translation": "..."}]
+);
+
 -- Indexes
 CREATE INDEX idx_shici_cards_character ON shici_cards(character);
 CREATE INDEX idx_annotations_text_id ON annotations(text_id);
