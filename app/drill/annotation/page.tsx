@@ -49,7 +49,12 @@ function scoreAnswer(userAnswer: string, annotation: Annotation): boolean {
 }
 
 export default function AnnotationDrillPage() {
-  const [texts, setTexts] = useState<Text[]>([])
+  const [texts, setTexts] = useState<Text[]>(() => {
+    try {
+      const cached = localStorage.getItem("texts_list")
+      return cached ? JSON.parse(cached) : []
+    } catch { return [] }
+  })
   const [selectedTextIds, setSelectedTextIds] = useState<string[]>([])
   const [filter, setFilter] = useState<Filter>("all")
   const [mode, setMode] = useState<Mode>("sequential")
@@ -65,7 +70,13 @@ export default function AnnotationDrillPage() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    fetch("/api/texts").then((r) => r.json()).then(setTexts).catch(() => {})
+    fetch("/api/texts")
+      .then((r) => r.json())
+      .then((data) => {
+        setTexts(data)
+        localStorage.setItem("texts_list", JSON.stringify(data))
+      })
+      .catch(() => {})
   }, [])
 
   async function startDrill() {

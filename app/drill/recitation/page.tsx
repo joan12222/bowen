@@ -29,7 +29,12 @@ function countErrors(user: string, correct: string): number {
 }
 
 export default function RecitationDrillPage() {
-  const [texts, setTexts] = useState<Text[]>([])
+  const [texts, setTexts] = useState<Text[]>(() => {
+    try {
+      const cached = localStorage.getItem("texts_list")
+      return cached ? JSON.parse(cached) : []
+    } catch { return [] }
+  })
   const [selectedTextId, setSelectedTextId] = useState<string>("")
   const [source, setSource] = useState<string>("")
   const [started, setStarted] = useState(false)
@@ -43,7 +48,13 @@ export default function RecitationDrillPage() {
   const [correctCount, setCorrectCount] = useState(0)
 
   useEffect(() => {
-    fetch("/api/texts").then((r) => r.json()).then(setTexts).catch(() => {})
+    fetch("/api/texts")
+      .then((r) => r.json())
+      .then((data) => {
+        setTexts(data)
+        localStorage.setItem("texts_list", JSON.stringify(data))
+      })
+      .catch(() => {})
   }, [])
 
   async function startDrill() {
