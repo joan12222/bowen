@@ -15,23 +15,24 @@ const VOLUME_ORDER: VolumeId[] = [
 ]
 
 export default function TextsPage() {
-  const [texts, setTexts] = useState<TextWithCounts[]>(() => {
-    try {
-      const cached = localStorage.getItem("texts_list")
-      return cached ? JSON.parse(cached) : []
-    } catch { return [] }
-  })
-  const [loading, setLoading] = useState(() => {
-    try { return !localStorage.getItem("texts_list") } catch { return true }
-  })
+  const [texts, setTexts] = useState<TextWithCounts[]>([])
+  const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<VolumeId>>(new Set(["required_2"]))
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem("texts_list")
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) { setTexts(parsed); setLoading(false) }
+      }
+    } catch {}
     fetch("/api/texts")
       .then((r) => r.json())
       .then((data) => {
-        setTexts(data)
-        localStorage.setItem("texts_list", JSON.stringify(data))
+        const list = Array.isArray(data) ? data : []
+        setTexts(list)
+        localStorage.setItem("texts_list", JSON.stringify(list))
         setLoading(false)
       })
       .catch(() => setLoading(false))

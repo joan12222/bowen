@@ -7,7 +7,7 @@ export async function GET() {
     const texts = await getTextsWithCounts()
     return NextResponse.json(texts)
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch texts" }, { status: 500 })
+    return NextResponse.json([], { status: 500 })
   }
 }
 

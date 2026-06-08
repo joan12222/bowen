@@ -12,12 +12,7 @@ const DIFF_COLORS = {
 }
 
 export default function TranslationDrillPage() {
-  const [texts, setTexts] = useState<Text[]>(() => {
-    try {
-      const cached = localStorage.getItem("texts_list")
-      return cached ? JSON.parse(cached) : []
-    } catch { return [] }
-  })
+  const [texts, setTexts] = useState<Text[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string>("")
   const [difficulty, setDifficulty] = useState<number>(0)
   const [reciteMode, setReciteMode] = useState(false)
@@ -30,6 +25,10 @@ export default function TranslationDrillPage() {
   const [reviewCount, setReviewCount] = useState(0)
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem("texts_list")
+      if (cached) setTexts(JSON.parse(cached))
+    } catch {}
     fetch("/api/texts")
       .then((r) => r.json())
       .then((data) => {

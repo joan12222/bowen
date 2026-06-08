@@ -1,34 +1,24 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { getTodayReviewCount, getMistakes } from "@/lib/db"
 
-async function getWeeklyStats() {
-  try {
-    const oneWeekAgo = new Date()
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-    // Count mistakes created this week as a proxy for practice
-    const mistakes = await getMistakes({ isMastered: false })
-    return mistakes.filter(m => m.createdAt > oneWeekAgo).length
-  } catch {
-    return 0
-  }
-}
+const drillItems = [
+  { href: "/drill/annotation", label: "注释背默", desc: "字词释义练习", color: "bg-red-50 border-red-200 text-red-800" },
+  { href: "/drill/translation", label: "句子翻译", desc: "句意理解自评", color: "bg-indigo-50 border-indigo-200 text-indigo-800" },
+  { href: "/drill/recitation", label: "理解性默写", desc: "情境填空练习", color: "bg-emerald-50 border-emerald-200 text-emerald-800" },
+  { href: "/drill/multi-meaning", label: "一词多义", desc: "跨篇义项对比", color: "bg-amber-50 border-amber-200 text-amber-800" },
+]
 
-export default async function HomePage() {
-  let reviewCount = 0
-  let weeklyCount = 0
-  try {
-    reviewCount = await getTodayReviewCount()
-    weeklyCount = await getWeeklyStats()
-  } catch {
-    // Supabase not configured yet
-  }
+export default function HomePage() {
+  const [reviewCount, setReviewCount] = useState<number | null>(null)
 
-  const drillItems = [
-    { href: "/drill/annotation", label: "注释背默", desc: "字词释义练习", color: "bg-red-50 border-red-200 text-red-800" },
-    { href: "/drill/translation", label: "句子翻译", desc: "句意理解自评", color: "bg-indigo-50 border-indigo-200 text-indigo-800" },
-    { href: "/drill/recitation", label: "理解性默写", desc: "情境填空练习", color: "bg-emerald-50 border-emerald-200 text-emerald-800" },
-    { href: "/drill/multi-meaning", label: "一词多义", desc: "跨篇义项对比", color: "bg-amber-50 border-amber-200 text-amber-800" },
-  ]
+  useEffect(() => {
+    fetch("/api/review/today/count")
+      .then((r) => r.json())
+      .then((d) => setReviewCount(d.count ?? 0))
+      .catch(() => setReviewCount(0))
+  }, [])
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
@@ -39,7 +29,7 @@ export default async function HomePage() {
       </div>
 
       {/* Today's Review */}
-      {reviewCount > 0 && (
+      {reviewCount !== null && reviewCount > 0 && (
         <Link href="/review/today">
           <div className="mb-4 bg-red-700 text-white rounded-2xl p-4 flex items-center justify-between shadow-sm active:opacity-90">
             <div>
@@ -57,7 +47,7 @@ export default async function HomePage() {
         </Link>
       )}
 
-      {reviewCount === 0 && (
+      {reviewCount !== null && reviewCount === 0 && (
         <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center gap-3">
           <div className="text-emerald-600 text-2xl">✓</div>
           <div>
@@ -68,11 +58,7 @@ export default async function HomePage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <div className="text-2xl font-bold text-gray-900">{weeklyCount}</div>
-          <div className="text-sm text-gray-500 mt-1">本周练习题数</div>
-        </div>
+      <div className="grid grid-cols-1 gap-3 mb-6">
         <Link href="/texts" className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm active:bg-gray-50">
           <div className="text-2xl font-bold text-gray-900">5</div>
           <div className="text-sm text-gray-500 mt-1">册次 · 查看篇目</div>

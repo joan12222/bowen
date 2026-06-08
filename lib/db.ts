@@ -450,20 +450,29 @@ export async function getTodayReviewQueue(): Promise<Mistake[]> {
 export async function getTextsWithCounts(): Promise<TextWithCounts[]> {
   const { data: texts, error } = await supabase.from('texts').select('*').order('text_order', { ascending: true })
   if (error) throw error
+  if (!texts || texts.length === 0) return []
 
-  const results: TextWithCounts[] = []
-  for (const t of texts || []) {
-    const [a, s, r] = await Promise.all([
-      supabase.from('annotations').select('id', { count: 'exact', head: true }).eq('text_id', t.id),
-      supabase.from('sentences').select('id', { count: 'exact', head: true }).eq('text_id', t.id),
-      supabase.from('recitation_questions').select('id', { count: 'exact', head: true }).eq('text_id', t.id),
-    ])
-    results.push({
-      ...rowToText(t),
-      annotationCount: a.count || 0,
-      sentenceCount: s.count || 0,
-      recitationCount: r.count || 0,
-    })
+  const textIds = texts.map((t) => t.id)
+
+  const [annRows, sentRows, recRows] = await Promise.all([
+    supabase.from('annotations').select('text_id').in('text_id', textIds),
+    supabase.from('sentences').select('text_id').in('text_id', textIds),
+    supabase.from('recitation_questions').select('text_id').in('text_id', textIds),
+  ])
+
+  const countMap = (rows: { text_id: string }[] | null) => {
+    const m: Record<string, number> = {}
+    for (const r of rows || []) m[r.text_id] = (m[r.text_id] || 0) + 1
+    return m
   }
-  return results
+  const annMap = countMap(annRows.data)
+  const sentMap = countMap(sentRows.data)
+  const recMap = countMap(recRows.data)
+
+  return texts.map((t) => ({
+    ...rowToText(t),
+    annotationCount: annMap[t.id] || 0,
+    sentenceCount: sentMap[t.id] || 0,
+    recitationCount: recMap[t.id] || 0,
+  }))
 }
