@@ -28,6 +28,9 @@ export default function TextDetailPage({ params }: { params: Promise<{ id: strin
   const [editingAppreciation, setEditingAppreciation] = useState(false)
   const [appreciationDraft, setAppreciationDraft] = useState("")
   const [savingAnalysis, setSavingAnalysis] = useState(false)
+  const [showRecitationImport, setShowRecitationImport] = useState(false)
+  const [recitationJsonDraft, setRecitationJsonDraft] = useState("")
+  const [importingRecitation, setImportingRecitation] = useState(false)
 
   async function saveContent() {
     setSavingContent(true)
@@ -46,13 +49,52 @@ export default function TextDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
+  async function importRecitationsFromJson() {
+    let parsed: { recitations?: unknown[] }
+    try {
+      parsed = JSON.parse(recitationJsonDraft)
+    } catch {
+      alert("JSON 格式错误，请检查")
+      return
+    }
+    if (!Array.isArray(parsed.recitations) || parsed.recitations.length === 0) {
+      alert("JSON 中未找到 recitations 数组")
+      return
+    }
+    setImportingRecitation(true)
+    try {
+      const res = await fetch(`/api/texts/${id}/import`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "recitations", data: parsed }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "导入失败")
+      localStorage.removeItem(`rec_${id}`)
+      const updated = await fetch(`/api/recitations?textId=${id}`).then((r) => r.json())
+      setRecitations(updated)
+      localStorage.setItem(`rec_${id}`, JSON.stringify(updated))
+      setText((prev) => prev ? { ...prev, recitationCount: updated.length } : prev)
+      setShowRecitationImport(false)
+      setRecitationJsonDraft("")
+      alert(`导入成功：新增 ${result.success} 条，跳过重复 ${result.skipped} 条`)
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "导入失败")
+    } finally {
+      setImportingRecitation(false)
+    }
+  }
+
   async function saveAnalysis() {
     setSavingAnalysis(true)
     try {
       const res = await fetch(`/api/texts/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ translation: translationDraft, appreciation: appreciationDraft }),
+        body: JSON.stringify({
+          translation: editingTranslation ? translationDraft : (text?.translation ?? ""),
+          appreciation: editingAppreciation ? appreciationDraft : (text?.appreciation ?? ""),
+        }),
       })
       if (!res.ok) throw new Error()
       const updated = await res.json()
@@ -73,10 +115,12 @@ export default function TextDetailPage({ params }: { params: Promise<{ id: strin
       try { setText(JSON.parse(cached)); setLoading(false) } catch {}
     }
     fetch(`/api/texts/${id}`)
-      .then((r) => r.json())
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        setText(data)
-        localStorage.setItem(cacheKey, JSON.stringify(data))
+        if (data?.id) {
+          setText(data)
+          localStorage.setItem(cacheKey, JSON.stringify(data))
+        }
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -87,8 +131,13 @@ export default function TextDetailPage({ params }: { params: Promise<{ id: strin
       const cached = localStorage.getItem(cacheKey)
       if (cached) { try { setter(JSON.parse(cached)) } catch {} }
       fetch(url)
-        .then((r) => r.json())
-        .then((data) => { setter(data); localStorage.setItem(cacheKey, JSON.stringify(data)) })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setter(data as T)
+            localStorage.setItem(cacheKey, JSON.stringify(data))
+          }
+        })
         .catch(() => {})
     }
     if (tab === "annotations") {
@@ -298,8 +347,14 @@ export default function TextDetailPage({ params }: { params: Promise<{ id: strin
       )}
       {tab === "recitations" && (
         <>
-          {recitations.length > 0 && (
-            <div className="flex justify-end mb-2">
+          <div className="flex justify-between items-center mb-2">
+            <button
+              onClick={() => { setShowRecitationImport((v) => !v); setRecitationJsonDraft("") }}
+              className="text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 px-3 py-1.5 rounded-lg active:opacity-80"
+            >
+              {showRecitationImport ? "取消导入" : "+ 导入默写题 JSON"}
+            </button>
+            {recitations.length > 0 && (
               <button
                 onClick={async () => {
                   if (!confirm(`清空《${text.title}》全部 ${recitations.length} 条默写题？`)) return
@@ -311,6 +366,30 @@ export default function TextDetailPage({ params }: { params: Promise<{ id: strin
               >
                 清空全部默写题
               </button>
+            )}
+          </div>
+          {showRecitationImport && (
+            <div className="mb-4 bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-50">
+                <div className="text-sm font-medium text-gray-700 mb-0.5">粘贴默写题 JSON</div>
+                <div className="text-xs text-gray-400">格式：{"{ \"recitations\": [{\"prompt\":\"...\",\"answer\":\"...\",\"answerLines\":[...],\"source\":\"...\"}] }"}</div>
+              </div>
+              <textarea
+                value={recitationJsonDraft}
+                onChange={(e) => setRecitationJsonDraft(e.target.value)}
+                placeholder='粘贴 JSON…'
+                rows={8}
+                className="w-full px-4 py-3 text-xs text-gray-800 outline-none bg-transparent resize-none placeholder-gray-300 font-mono leading-5"
+              />
+              <div className="px-4 pb-3">
+                <button
+                  onClick={importRecitationsFromJson}
+                  disabled={!recitationJsonDraft.trim() || importingRecitation}
+                  className="w-full bg-indigo-700 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40"
+                >
+                  {importingRecitation ? "导入中…" : "导入默写题"}
+                </button>
+              </div>
             </div>
           )}
           <RecitationList recitations={recitations} />
