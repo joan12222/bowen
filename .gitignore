@@ -51,6 +51,7 @@ public/uploads/
 *.docx
 *.zip
 *.gzip
+300实词/
 
 # test/temp files in root
 *.jpg
