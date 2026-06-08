@@ -53,6 +53,20 @@ export default function ReviewPage() {
     setMistakes((prev) => prev.filter((m) => m.id !== id))
   }
 
+  async function handleDelete(id: string) {
+    await fetch(`/api/mistakes/${id}`, { method: "DELETE" })
+    setMistakes((prev) => prev.filter((m) => m.id !== id))
+  }
+
+  async function handleClearAll() {
+    const label = filter === "all" ? "全部错题" : `所有${["注释", "翻译", "默写", "多义"][["annotation", "translation", "recitation", "multiMeaning"].indexOf(filter)]}错题`
+    if (!confirm(`确定删除${label}？此操作不可恢复。`)) return
+    const params = new URLSearchParams()
+    if (filter !== "all") params.set("questionType", filter)
+    await fetch(`/api/mistakes?${params}`, { method: "DELETE" })
+    setMistakes([])
+  }
+
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -104,7 +118,15 @@ export default function ReviewPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          <div className="text-sm text-gray-400 mb-2">共 {mistakes.length} 条错题</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm text-gray-400">共 {mistakes.length} 条错题</div>
+            <button
+              onClick={handleClearAll}
+              className="text-xs text-red-500 border border-red-200 px-3 py-1 rounded-lg active:bg-red-50"
+            >
+              清除全部
+            </button>
+          </div>
           {mistakes.map((m) => {
             const reviewDate = new Date(m.nextReviewAt)
             const isDue = reviewDate <= new Date()
@@ -124,12 +146,20 @@ export default function ReviewPage() {
                 </div>
                 <div className="text-sm font-medium text-gray-900 mb-1">{m.correctAnswer}</div>
                 <div className="text-xs text-gray-400 mb-2">你的答案：{m.userAnswer}</div>
-                <button
-                  onClick={() => handleMastered(m.id)}
-                  className="text-xs text-emerald-600 border border-emerald-200 px-3 py-1 rounded-lg active:bg-emerald-50"
-                >
-                  已掌握
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleMastered(m.id)}
+                    className="text-xs text-emerald-600 border border-emerald-200 px-3 py-1 rounded-lg active:bg-emerald-50"
+                  >
+                    已掌握
+                  </button>
+                  <button
+                    onClick={() => handleDelete(m.id)}
+                    className="text-xs text-red-500 border border-red-200 px-3 py-1 rounded-lg active:bg-red-50"
+                  >
+                    删除
+                  </button>
+                </div>
               </div>
             )
           })}

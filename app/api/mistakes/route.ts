@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getMistakes, addMistake } from "@/lib/db"
+import { supabase } from "@/lib/supabase"
 import { Mistake } from "@/lib/types"
 
 export async function GET(req: NextRequest) {
@@ -14,6 +15,36 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(mistakes)
   } catch {
     return NextResponse.json([], { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const questionType = searchParams.get("questionType")
+  try {
+    let query = supabase.from("mistakes").delete().eq("is_mastered", false)
+    if (questionType) query = (query as any).eq("question_type", questionType)
+    const { error } = await query
+    if (error) throw error
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: "Failed" }, { status: 500 })
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { referenceId, questionType } = await req.json()
+    const { error } = await supabase
+      .from("mistakes")
+      .update({ is_mastered: true })
+      .eq("reference_id", referenceId)
+      .eq("question_type", questionType)
+      .eq("is_mastered", false)
+    if (error) throw error
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: "Failed" }, { status: 500 })
   }
 }
 

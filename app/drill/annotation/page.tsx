@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
-import { Annotation, Text, AnnotationCategory } from "@/lib/types"
+import { Annotation, Text, AnnotationCategory, Mistake } from "@/lib/types"
 import { ANNOTATION_CATEGORY_LABELS } from "@/lib/constants"
 
-type Mode = "sequential" | "random" | "mistakes" | "hsf" | "unmastered"
+type Mode = "sequential" | "random" | "mistakes" | "hsf"
 type Filter = "all" | AnnotationCategory | "hsf"
 
 const MODE_LABELS: Record<Mode, string> = {
@@ -13,7 +13,6 @@ const MODE_LABELS: Record<Mode, string> = {
   random: "随机",
   mistakes: "只练错题",
   hsf: "高频300字",
-  unmastered: "未掌握",
 }
 
 const FILTER_OPTIONS: { key: Filter; label: string }[] = [
@@ -49,12 +48,7 @@ function scoreAnswer(userAnswer: string, annotation: Annotation): boolean {
 }
 
 export default function AnnotationDrillPage() {
-  const [texts, setTexts] = useState<Text[]>(() => {
-    try {
-      const cached = localStorage.getItem("texts_list")
-      return cached ? JSON.parse(cached) : []
-    } catch { return [] }
-  })
+  const [texts, setTexts] = useState<Text[]>([])
   const [selectedTextIds, setSelectedTextIds] = useState<string[]>([])
   const [filter, setFilter] = useState<Filter>("all")
   const [mode, setMode] = useState<Mode>("sequential")
@@ -63,13 +57,18 @@ export default function AnnotationDrillPage() {
   const [queue, setQueue] = useState<Annotation[]>([])
   const [current, setCurrent] = useState(0)
   const [userAnswer, setUserAnswer] = useState("")
+  const [showAnswer, setShowAnswer] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [correct, setCorrect] = useState(false)
   const [finished, setFinished] = useState(false)
-  const [correctCount, setCorrectCount] = useState(0)
+  const [masteredCount, setMasteredCount] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
+    try {
+      const cached = localStorage.getItem("texts_list")
+      if (cached) setTexts(JSON.parse(cached))
+    } catch {}
     fetch("/api/texts")
       .then((r) => r.json())
       .then((data) => {
@@ -89,10 +88,16 @@ export default function AnnotationDrillPage() {
     } else if (filter !== "all") {
       params.set("category", filter)
     }
-    if (mode === "mistakes") params.set("mistakesOnly", "true")
 
     const res = await fetch(`/api/annotations?${params}`)
     let items: Annotation[] = await res.json()
+
+    if (mode === "mistakes") {
+      const mRes = await fetch("/api/mistakes?questionType=annotation&isMastered=false")
+      const mistakes: Mistake[] = await mRes.json()
+      const mistakeIds = new Set(mistakes.map((m) => m.referenceId))
+      items = items.filter((ann) => mistakeIds.has(ann.id))
+    }
 
     if (mode === "random") {
       items = items.sort(() => Math.random() - 0.5)
@@ -101,10 +106,23 @@ export default function AnnotationDrillPage() {
     setQueue(items)
     setCurrent(0)
     setUserAnswer("")
+    setShowAnswer(false)
     setSubmitted(false)
-    setCorrectCount(0)
+    setMasteredCount(0)
     setFinished(false)
     setStarted(true)
+  }
+
+  function goNext() {
+    if (current + 1 >= queue.length) {
+      setFinished(true)
+    } else {
+      setCurrent((c) => c + 1)
+      setUserAnswer("")
+      setShowAnswer(false)
+      setSubmitted(false)
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
   }
 
   function handleSubmit() {
@@ -112,31 +130,35 @@ export default function AnnotationDrillPage() {
     const isCorrect = scoreAnswer(userAnswer, queue[current])
     setCorrect(isCorrect)
     setSubmitted(true)
-    if (isCorrect) {
-      setCorrectCount((c) => c + 1)
-    } else {
-      fetch("/api/mistakes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          questionType: "annotation",
-          referenceId: queue[current].id,
-          userAnswer,
-          correctAnswer: queue[current].answer,
-        }),
-      }).catch(() => {})
-    }
+    setShowAnswer(true)
   }
 
-  function handleNext() {
-    if (current + 1 >= queue.length) {
-      setFinished(true)
-    } else {
-      setCurrent((c) => c + 1)
-      setUserAnswer("")
-      setSubmitted(false)
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
+  function markMastered(referenceId: string) {
+    fetch("/api/mistakes", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ referenceId, questionType: "annotation" }),
+    }).catch(() => {})
+  }
+
+  function handleMastered() {
+    markMastered(queue[current].id)
+    setMasteredCount((c) => c + 1)
+    goNext()
+  }
+
+  function handleNotMastered(answer = "") {
+    fetch("/api/mistakes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        questionType: "annotation",
+        referenceId: queue[current].id,
+        userAnswer: answer,
+        correctAnswer: queue[current].answer,
+      }),
+    }).catch(() => {})
+    goNext()
   }
 
   if (!started) {
@@ -151,7 +173,6 @@ export default function AnnotationDrillPage() {
           <h1 className="text-xl font-bold text-gray-900">注释背默</h1>
         </div>
 
-        {/* Text selection */}
         <div className="mb-4">
           <div className="text-sm font-medium text-gray-700 mb-2">选择篇目（不选则全部）</div>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -177,7 +198,6 @@ export default function AnnotationDrillPage() {
           </div>
         </div>
 
-        {/* Filter */}
         <div className="mb-4">
           <div className="text-sm font-medium text-gray-700 mb-2">分类筛选</div>
           <div className="flex flex-wrap gap-2">
@@ -197,7 +217,6 @@ export default function AnnotationDrillPage() {
           </div>
         </div>
 
-        {/* Mode */}
         <div className="mb-6">
           <div className="text-sm font-medium text-gray-700 mb-2">练习模式</div>
           <div className="flex flex-wrap gap-2">
@@ -239,9 +258,9 @@ export default function AnnotationDrillPage() {
         ) : (
           <>
             <div className="text-xl font-bold text-gray-900 mb-2">练习完成！</div>
-            <div className="text-gray-500 mb-2">共 {queue.length} 题，答对 {correctCount} 题</div>
+            <div className="text-gray-500 mb-2">共 {queue.length} 题，已掌握 {masteredCount} 题</div>
             <div className="text-2xl font-bold text-red-700 mb-6">
-              {Math.round((correctCount / queue.length) * 100)}%
+              {Math.round((masteredCount / queue.length) * 100)}%
             </div>
           </>
         )}
@@ -278,7 +297,6 @@ export default function AnnotationDrillPage() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-6">
-      {/* Progress bar */}
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => setStarted(false)} className="text-gray-500">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
@@ -288,13 +306,12 @@ export default function AnnotationDrillPage() {
         <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
           <div
             className="h-full bg-red-600 rounded-full transition-all"
-            style={{ width: `${((current) / queue.length) * 100}%` }}
+            style={{ width: `${(current / queue.length) * 100}%` }}
           />
         </div>
         <span className="text-sm text-gray-500">{current + 1}/{queue.length}</span>
       </div>
 
-      {/* Card */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 mb-4">
         <div className="flex items-center gap-2 mb-4">
           <span className={`text-xs px-2 py-1 rounded-full ${DIFF_COLORS[ann.category]}`}>
@@ -305,7 +322,6 @@ export default function AnnotationDrillPage() {
           )}
         </div>
 
-        {/* Context */}
         <div className="text-lg text-gray-700 mb-2 leading-8">
           {highlightWord(ann.context, ann.word)}
         </div>
@@ -313,9 +329,11 @@ export default function AnnotationDrillPage() {
           <div className="text-sm text-gray-400 mb-4">{ann.word}：{ann.pinyin}</div>
         )}
 
-        {!submitted ? (
+        <div className="text-sm text-gray-500 mb-3">解释「{ann.word}」</div>
+
+        {/* Phase 1: input + 显示答案 */}
+        {!showAnswer && (
           <>
-            <div className="text-sm text-gray-500 mb-2">解释"{ann.word}"</div>
             <input
               ref={inputRef}
               autoFocus
@@ -324,19 +342,30 @@ export default function AnnotationDrillPage() {
               onChange={(e) => setUserAnswer(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && userAnswer.trim()) handleSubmit() }}
               placeholder="输入释义…"
-              className="w-full border-b-2 border-gray-200 focus:border-red-500 py-2 text-base text-gray-900 outline-none bg-transparent transition-colors"
+              className="w-full border-b-2 border-gray-200 focus:border-red-500 py-2 text-base text-gray-900 outline-none bg-transparent transition-colors mb-4"
             />
-            <button
-              onClick={handleSubmit}
-              disabled={!userAnswer.trim()}
-              className="w-full mt-4 bg-gray-900 text-white py-3 rounded-2xl font-semibold active:opacity-80 disabled:opacity-30"
-            >
-              确认
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowAnswer(true)}
+                className="flex-1 py-3 rounded-2xl border border-gray-200 text-gray-500 text-sm font-medium hover:border-gray-300 transition-colors"
+              >
+                显示答案
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={!userAnswer.trim()}
+                className="flex-1 py-3 rounded-2xl bg-gray-900 text-white text-sm font-semibold active:opacity-80 disabled:opacity-30"
+              >
+                确认
+              </button>
+            </div>
           </>
-        ) : (
+        )}
+
+        {/* Phase 2a: auto-scored result */}
+        {showAnswer && submitted && (
           <>
-            <div className={`mt-2 rounded-2xl p-4 ${correct ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
+            <div className={`rounded-2xl p-4 mb-4 ${correct ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
               <div className={`text-sm font-semibold mb-1 ${correct ? "text-green-700" : "text-red-700"}`}>
                 {correct ? "✓ 正确" : "✗ 错误"}
               </div>
@@ -348,12 +377,46 @@ export default function AnnotationDrillPage() {
                 <div className="text-xs text-gray-500 mt-1">关键词：{ann.loose.join("、")}</div>
               )}
             </div>
-            <button
-              onClick={handleNext}
-              className="w-full mt-4 bg-gray-900 text-white py-3 rounded-2xl font-semibold active:opacity-80"
-            >
-              {current + 1 >= queue.length ? "查看结果" : "下一题"}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleNotMastered(userAnswer)}
+                className="flex-1 py-3 rounded-2xl border-2 border-red-200 text-red-600 font-semibold text-sm active:opacity-80"
+              >
+                未掌握
+              </button>
+              <button
+                onClick={handleMastered}
+                className="flex-1 py-3 rounded-2xl bg-green-600 text-white font-semibold text-sm active:opacity-80"
+              >
+                已掌握
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* Phase 2b: self-assessment after 显示答案 */}
+        {showAnswer && !submitted && (
+          <>
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-4">
+              <div className="text-base font-medium text-gray-900">{ann.answer}</div>
+              {ann.loose.length > 0 && (
+                <div className="text-xs text-gray-500 mt-1.5">关键词：{ann.loose.join("、")}</div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleNotMastered()}
+                className="flex-1 py-3 rounded-2xl border-2 border-red-200 text-red-600 font-semibold text-sm active:opacity-80"
+              >
+                未掌握
+              </button>
+              <button
+                onClick={handleMastered}
+                className="flex-1 py-3 rounded-2xl bg-green-600 text-white font-semibold text-sm active:opacity-80"
+              >
+                已掌握
+              </button>
+            </div>
           </>
         )}
       </div>
