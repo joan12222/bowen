@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { TextWithCounts, VolumeId } from "@/lib/types"
 import { VOLUME_LABELS } from "@/lib/constants"
+import { getTextsWithCounts } from "@/lib/db.local"
 
 const VOLUME_ORDER: VolumeId[] = [
   "required_1",
@@ -20,22 +21,9 @@ export default function TextsPage() {
   const [expanded, setExpanded] = useState<Set<VolumeId>>(new Set(["required_2"]))
 
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem("texts_list")
-      if (cached) {
-        const parsed = JSON.parse(cached)
-        if (Array.isArray(parsed)) { setTexts(parsed); setLoading(false) }
-      }
-    } catch {}
-    fetch("/api/texts")
-      .then((r) => r.json())
-      .then((data) => {
-        const list = Array.isArray(data) ? data : []
-        setTexts(list)
-        localStorage.setItem("texts_list", JSON.stringify(list))
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
+    getTextsWithCounts()
+      .then((list) => setTexts(list))
+      .finally(() => setLoading(false))
   }, [])
 
   const grouped = VOLUME_ORDER.reduce<Record<VolumeId, TextWithCounts[]>>(
@@ -107,7 +95,7 @@ export default function TextsPage() {
                       const poetry = items.filter(t => t.textType === 'gushici')
                       const hasBoth = prose.length > 0 && poetry.length > 0
                       const renderItem = (text: typeof items[0], idx: number, showBorder: boolean) => (
-                        <Link key={text.id} href={`/texts/${text.id}`}>
+                        <Link key={text.id} href={`/texts/detail?id=${text.id}`}>
                           <div className={`flex items-center justify-between px-4 py-3 active:bg-gray-50 ${showBorder ? "border-t border-gray-50" : ""}`}>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium text-gray-900 truncate">{text.title}</div>

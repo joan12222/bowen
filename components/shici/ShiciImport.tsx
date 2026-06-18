@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { transaction } from '@/lib/sqlite/client'
+import type { StatementSpec } from '@/lib/sqlite/worker'
 
 export default function ShiciImport() {
   const [status, setStatus] = useState('')
@@ -31,37 +32,31 @@ export default function ShiciImport() {
 
     setStatus(`导入中（共 ${words.length} 个实词）...`)
 
-    for (const w of words) {
-      const { error: wordError } = await supabase
-        .from('shici_words')
-        .upsert({
-          id: w.id,
-          word: w.word,
-          pinyin: w.pinyin,
-          char_type: w.char_type,
-          origin: w.origin,
-          base_meaning: w.base_meaning,
+    try {
+      const statements: StatementSpec[] = []
+      for (const w of words) {
+        statements.push({
+          sql: `INSERT INTO shici_words (id, word, pinyin, char_type, origin, base_meaning)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                  word = excluded.word, pinyin = excluded.pinyin, char_type = excluded.char_type,
+                  origin = excluded.origin, base_meaning = excluded.base_meaning`,
+          params: [w.id, w.word, w.pinyin, w.char_type ?? null, w.origin ?? null, w.base_meaning],
         })
-      if (wordError) {
-        setStatus(`错误：${wordError.message}`)
-        setLoading(false)
-        return
+        statements.push({ sql: 'DELETE FROM shici_senses WHERE word_id = ?', params: [w.id] })
+        for (const s of w.senses as any[]) {
+          statements.push({
+            sql: `INSERT INTO shici_senses (id, word_id, pos, meaning, sense_order, examples)
+                  VALUES (?, ?, ?, ?, ?, ?)`,
+            params: [crypto.randomUUID(), w.id, s.pos, s.meaning, s.sense_order, JSON.stringify(s.examples)],
+          })
+        }
       }
-
-      await supabase.from('shici_senses').delete().eq('word_id', w.id)
-      const senses = w.senses.map((s: any) => ({
-        word_id: w.id,
-        pos: s.pos,
-        meaning: s.meaning,
-        sense_order: s.sense_order,
-        examples: s.examples,
-      }))
-      const { error: senseError } = await supabase.from('shici_senses').insert(senses)
-      if (senseError) {
-        setStatus(`错误：${senseError.message}`)
-        setLoading(false)
-        return
-      }
+      await transaction(statements)
+    } catch (err) {
+      setStatus(`错误：${err instanceof Error ? err.message : '导入失败'}`)
+      setLoading(false)
+      return
     }
 
     setStatus(`✓ 导入完成：${words.length} 个实词`)

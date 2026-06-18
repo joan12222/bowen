@@ -1,8 +1,24 @@
-import Link from 'next/link'
-import { getShiciList } from '@/lib/shici'
+"use client"
 
-export default async function ShiciListPage() {
-  const words = await getShiciList()
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { getShiciList } from '@/lib/shici.local'
+
+type ShiciListItem = Awaited<ReturnType<typeof getShiciList>>[number]
+
+export default function ShiciListPage() {
+  const [words, setWords] = useState<ShiciListItem[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getShiciList()
+      .then((data) => { setWords(data); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64 text-gray-400">加载中…</div>
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 pt-4 pb-24">
@@ -34,7 +50,7 @@ export default async function ShiciListPage() {
           {words.map(w => (
             <Link
               key={w.id}
-              href={`/shici/${w.id}`}
+              href={`/shici/detail?id=${w.id}`}
               className="flex flex-col items-center p-3 rounded-xl border border-gray-200 hover:border-red-400 hover:bg-red-50 active:opacity-80 transition-colors"
             >
               <span className="text-xs text-gray-400">{w.id}</span>

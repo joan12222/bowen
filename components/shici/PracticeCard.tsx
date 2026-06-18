@@ -1,7 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { EBBINGHAUS_INTERVALS } from '@/lib/constants'
+import { addMistake } from '@/lib/db.local'
 
 function generateQuestion(word: any, senses: any[]) {
   const sense = senses[Math.floor(Math.random() * senses.length)]
@@ -41,15 +40,11 @@ export default function PracticeCard({ word, senses }: { word: any, senses: any[
     setScore(s => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }))
 
     if (!correct) {
-      const nextReview = new Date()
-      nextReview.setDate(nextReview.getDate() + EBBINGHAUS_INTERVALS[0])
-      await supabase.from('mistakes').insert({
-        question_type: 'shici',
-        reference_id: q.senseId,
-        user_answer: opt,
-        correct_answer: q.answer,
-        next_review_at: nextReview.toISOString(),
-        review_count: 1,
+      await addMistake({
+        questionType: 'shici',
+        referenceId: q.senseId,
+        userAnswer: opt,
+        correctAnswer: q.answer,
       })
     }
   }

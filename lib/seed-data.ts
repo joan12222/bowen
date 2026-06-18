@@ -109,6 +109,17 @@ export const SEED_TEXTS = [
     content: "",
     isBuiltin: true,
   },
+  {
+    title: "促织",
+    author: "蒲松龄",
+    dynasty: "清",
+    source: "《聊斋志异》",
+    volumeId: "required_2",
+    textType: "wenyanwen",
+    textOrder: 11,
+    content: "",
+    isBuiltin: true,
+  },
   // 必修下 古诗词诵读
   { title: "登岳阳楼", author: "杜甫", dynasty: "唐", source: "", volumeId: "required_2", textType: "gushici", textOrder: 11, content: "", isBuiltin: true },
   { title: "桂枝香·金陵怀古", author: "王安石", dynasty: "宋", source: "", volumeId: "required_2", textType: "gushici", textOrder: 12, content: "", isBuiltin: true },

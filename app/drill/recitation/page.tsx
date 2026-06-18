@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { RecitationQuestion, Text } from "@/lib/types"
+import { getTexts, getRecitationQuestions, addMistake } from "@/lib/db.local"
 
 type RecitationMode = "all" | "byText" | "mistakes" | "gaokao" | "mock"
 
@@ -43,25 +44,14 @@ export default function RecitationDrillPage() {
   const [correctCount, setCorrectCount] = useState(0)
 
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem("texts_list")
-      if (cached) setTexts(JSON.parse(cached))
-    } catch {}
-    fetch("/api/texts")
-      .then((r) => r.json())
-      .then((data) => {
-        setTexts(data)
-        localStorage.setItem("texts_list", JSON.stringify(data))
-      })
-      .catch(() => {})
+    getTexts().then(setTexts).catch(() => {})
   }, [])
 
   async function startDrill() {
-    const params = new URLSearchParams()
-    if (selectedTextId) params.set("textId", selectedTextId)
-    if (source) params.set("source", source)
-    const res = await fetch(`/api/recitations?${params}`)
-    const items: RecitationQuestion[] = await res.json()
+    // NOTE: source filter is not applied here — this mirrors the previous
+    // /api/recitations behavior, which accepted a `source` param but never
+    // used it (filtering was a stubbed-out "client side for now" no-op).
+    const items = await getRecitationQuestions(selectedTextId || undefined)
     const shuffled = items.sort(() => Math.random() - 0.5)
     setQueue(shuffled)
     setCurrent(0)
@@ -92,15 +82,11 @@ export default function RecitationDrillPage() {
     const anyWrong = newResults.some((r) => r.status === "wrong")
     if (allCorrect) setCorrectCount((c) => c + 1)
     if (anyWrong || newResults.some((r) => r.status === "typo")) {
-      fetch("/api/mistakes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          questionType: "recitation",
-          referenceId: q.id,
-          userAnswer: answers.join("；"),
-          correctAnswer: q.answer,
-        }),
+      addMistake({
+        questionType: "recitation",
+        referenceId: q.id,
+        userAnswer: answers.join("；"),
+        correctAnswer: q.answer,
       }).catch(() => {})
     }
   }

@@ -114,8 +114,8 @@ export interface ParseResult {
 }
 
 export function parseParas(paras: string[]): ParseResult {
-  const isContentHeader = (s: string) => /^(【)?原文(】)?$/.test(s) || s.startsWith("原文（") || s.startsWith("原文(") || s.startsWith("【原文】") || s.startsWith("原文（")
-  const isAnnotHeader  = (s: string) => /^(【)?注释(】)?$/.test(s) || s.startsWith("注释（") || s.startsWith("注释(") || s.startsWith("【注释】") || s.startsWith("注释（")
+  const isContentHeader = (s: string) => { s = s.trim(); return /^(【)?原文(】)?$/.test(s) || s.startsWith("原文（") || s.startsWith("原文(") || s.startsWith("【原文】") }
+  const isAnnotHeader  = (s: string) => { s = s.trim(); return /^(【)?注释(】)?$/.test(s) || s.startsWith("注释（") || s.startsWith("注释(") || s.startsWith("【注释】") }
 
   const sections: { contentParas: string[]; annParas: string[] }[] = []
   let i = 0

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { VolumeId } from "@/lib/types"
 import { VOLUME_LABELS } from "@/lib/constants"
+import { createText } from "@/lib/db.local"
 
 const VOLUMES = Object.entries(VOLUME_LABELS) as [VolumeId, string][]
 
@@ -29,15 +30,18 @@ export default function NewTextPage() {
     if (!form.title || !form.author) return
     setSaving(true)
     try {
-      const res = await fetch("/api/texts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+      const text = await createText({
+        title: form.title,
+        author: form.author,
+        dynasty: form.dynasty || "",
+        source: form.source || "",
+        volumeId: form.volumeId,
+        textType: "wenyanwen",
+        textOrder: 999,
+        content: form.content || "",
+        isBuiltin: false,
       })
-      if (!res.ok) throw new Error("Failed")
-      const text = await res.json()
-      localStorage.removeItem("texts_list")
-      router.push(`/texts/${text.id}`)
+      router.push(`/texts/detail?id=${text.id}`)
     } catch {
       alert("保存失败，请重试")
     } finally {

@@ -1,30 +1,19 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import { Annotation, Text, AnnotationCategory, Mistake } from "@/lib/types"
 import { ANNOTATION_CATEGORY_LABELS } from "@/lib/constants"
+import { getTexts, getAllAnnotations, getMistakes, addMistake, markMistakeMasteredByReference } from "@/lib/db.local"
 
-type Mode = "sequential" | "random" | "mistakes" | "hsf"
-type Filter = "all" | AnnotationCategory | "hsf"
+type Mode = "sequential" | "random" | "mistakes"
 
 const MODE_LABELS: Record<Mode, string> = {
   sequential: "顺序",
   random: "随机",
   mistakes: "只练错题",
-  hsf: "高频300字",
 }
-
-const FILTER_OPTIONS: { key: Filter; label: string }[] = [
-  { key: "all", label: "全部" },
-  { key: "shiCi", label: "实词" },
-  { key: "xuCi", label: "虚词" },
-  { key: "tongJia", label: "通假字" },
-  { key: "guJinYiYi", label: "古今异义" },
-  { key: "ciLeiHuoYong", label: "词类活用" },
-  { key: "teShüJuShi", label: "特殊句式" },
-  { key: "hsf", label: "高频300字" },
-]
 
 function highlightWord(context: string, word: string): React.ReactNode {
   const idx = context.indexOf(word)
@@ -47,10 +36,10 @@ function scoreAnswer(userAnswer: string, annotation: Annotation): boolean {
   return annotation.loose.some((kw) => ua.includes(kw) || kw.includes(ua))
 }
 
-export default function AnnotationDrillPage() {
+function AnnotationDrillContent() {
+  const searchParams = useSearchParams()
   const [texts, setTexts] = useState<Text[]>([])
   const [selectedTextIds, setSelectedTextIds] = useState<string[]>([])
-  const [filter, setFilter] = useState<Filter>("all")
   const [mode, setMode] = useState<Mode>("sequential")
   const [started, setStarted] = useState(false)
 
@@ -65,36 +54,21 @@ export default function AnnotationDrillPage() {
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    try {
-      const cached = localStorage.getItem("texts_list")
-      if (cached) setTexts(JSON.parse(cached))
-    } catch {}
-    fetch("/api/texts")
-      .then((r) => r.json())
-      .then((data) => {
-        setTexts(data)
-        localStorage.setItem("texts_list", JSON.stringify(data))
-      })
-      .catch(() => {})
+    getTexts().then(setTexts).catch(() => {})
   }, [])
 
-  async function startDrill() {
-    const params = new URLSearchParams()
-    if (selectedTextIds.length > 0) {
-      selectedTextIds.forEach((id) => params.append("textId", id))
-    }
-    if (filter === "hsf") {
-      params.set("hsfOnly", "true")
-    } else if (filter !== "all") {
-      params.set("category", filter)
-    }
+  useEffect(() => {
+    const textId = searchParams.get("textId")
+    if (textId) setSelectedTextIds([textId])
+  }, [searchParams])
 
-    const res = await fetch(`/api/annotations?${params}`)
-    let items: Annotation[] = await res.json()
+  async function startDrill() {
+    let items: Annotation[] = await getAllAnnotations({
+      textIds: selectedTextIds.length > 0 ? selectedTextIds : undefined,
+    })
 
     if (mode === "mistakes") {
-      const mRes = await fetch("/api/mistakes?questionType=annotation&isMastered=false")
-      const mistakes: Mistake[] = await mRes.json()
+      const mistakes: Mistake[] = await getMistakes({ questionType: "annotation", isMastered: false })
       const mistakeIds = new Set(mistakes.map((m) => m.referenceId))
       items = items.filter((ann) => mistakeIds.has(ann.id))
     }
@@ -134,11 +108,7 @@ export default function AnnotationDrillPage() {
   }
 
   function markMastered(referenceId: string) {
-    fetch("/api/mistakes", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ referenceId, questionType: "annotation" }),
-    }).catch(() => {})
+    markMistakeMasteredByReference(referenceId, "annotation").catch(() => {})
   }
 
   function handleMastered() {
@@ -148,15 +118,11 @@ export default function AnnotationDrillPage() {
   }
 
   function handleNotMastered(answer = "") {
-    fetch("/api/mistakes", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        questionType: "annotation",
-        referenceId: queue[current].id,
-        userAnswer: answer,
-        correctAnswer: queue[current].answer,
-      }),
+    addMistake({
+      questionType: "annotation",
+      referenceId: queue[current].id,
+      userAnswer: answer,
+      correctAnswer: queue[current].answer,
     }).catch(() => {})
     goNext()
   }
@@ -195,25 +161,6 @@ export default function AnnotationDrillPage() {
                 </label>
               ))
             )}
-          </div>
-        </div>
-
-        <div className="mb-4">
-          <div className="text-sm font-medium text-gray-700 mb-2">分类筛选</div>
-          <div className="flex flex-wrap gap-2">
-            {FILTER_OPTIONS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
-                  filter === f.key
-                    ? "bg-red-700 text-white border-red-700"
-                    : "bg-white text-gray-700 border-gray-200"
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
           </div>
         </div>
 
@@ -421,5 +368,13 @@ export default function AnnotationDrillPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function AnnotationDrillPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-64 text-gray-400">加载中…</div>}>
+      <AnnotationDrillContent />
+    </Suspense>
   )
 }

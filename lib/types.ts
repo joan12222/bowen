@@ -79,7 +79,7 @@ export interface ShiciCard {
 
 export interface Mistake {
   id: string
-  questionType: 'annotation' | 'translation' | 'recitation' | 'multiMeaning'
+  questionType: 'annotation' | 'translation' | 'recitation' | 'multiMeaning' | 'shici'
   referenceId: string
   userAnswer: string
   correctAnswer: string
@@ -87,6 +87,13 @@ export interface Mistake {
   nextReviewAt: Date
   isMastered: boolean
   createdAt: Date
+  // context fields populated via JOIN
+  annWord?: string
+  annContext?: string
+  annTextTitle?: string
+  shiciCharacter?: string
+  shiciExample?: string
+  shiciSource?: string
 }
 
 export interface TextWithCounts extends Text {
