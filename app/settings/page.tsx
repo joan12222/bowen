@@ -114,6 +114,10 @@ export default function SettingsPage() {
         </button>
       </div>
 
+      <div className="text-center text-xs text-gray-400 mt-6">
+        版本 {process.env.NEXT_PUBLIC_APP_VERSION}
+      </div>
+
       {message && (
         <div
           className={`rounded-2xl p-4 text-sm ${
