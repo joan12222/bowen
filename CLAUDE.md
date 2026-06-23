@@ -51,9 +51,23 @@ Postgres→SQLite 类型映射：UUID→TEXT、BOOLEAN→INTEGER（0/1）、数�
 
 核心表：`texts`、`annotations`、`sentences`、`recitation_questions`、`mistakes`、`shici_cards`、`shici_words/senses`、`meta`。
 
+### 版本号说明
+
+| 版本 | 位置 | 更新原则 |
+|---|---|---|
+| `version` | `package.json` | 发版时改：新功能 minor +1，内容/修复 patch +1 |
+| `BUILTIN_CONTENT_SEED_VERSION` | `lib/sqlite/seed.ts` | `builtin-content.json` 有任何变动就 +1 |
+| `CACHE_VERSION` | `public/sw.js` | 静态文件有变动就 +1，包括 JS/CSS/HTML/图标以及 `builtin-content.json` |
+
+**联动规则：`builtin-content.json` 变动时，`BUILTIN_CONTENT_SEED_VERSION` 和 `CACHE_VERSION` 都必须 +1。**
+
 ### 发版检查清单
 
-1. 修改 `public/sw.js` 中的 `CACHE_VERSION`
-2. 若种子数据有变动，同步修改对应版本号
-3. `npm run build`，确认无报错
-4. 将 `out/` 部署到托管平台
+1. 修改 `package.json` 中的 `version`
+2. 若 `builtin-content.json` 有变动：`BUILTIN_CONTENT_SEED_VERSION` +1，`CACHE_VERSION` +1
+3. 若其他静态资源有变动：`CACHE_VERSION` +1
+4. `npm run build`，确认无报错
+5. 将 `out/` 部署到托管平台
+
+## 注意事项
+- MEMORY.md 保持在 150 行以内，删除过时内容

@@ -80,8 +80,8 @@ async function main() {
   console.log(`Wrote lib/seed/builtin-content.json`)
 
   console.log("\nFetching shici cards...")
-  const shiciCards = await fetchAll("shici_cards", "order=id")
-  console.log(`  ${shiciCards.length} shici cards`)
+  const poemCards = await fetchAll("poem_cards", "order=id")
+  console.log(`  ${poemCards.length} poem cards`)
 
   console.log("Fetching shici words...")
   const shiciWords = await fetchAll("shici_words", "order=id")
@@ -91,7 +91,7 @@ async function main() {
   const shiciSenses = await fetchAll("shici_senses", "order=word_id,sense_order")
   console.log(`  ${shiciSenses.length} shici senses`)
 
-  const shiciSeed = { shiciCards, shiciWords, shiciSenses }
+  const shiciSeed = { poemCards, shiciWords, shiciSenses }
   writeFileSync(join(SEED_DIR, "shici-seed.json"), JSON.stringify(shiciSeed, null, 2))
   console.log(`Wrote lib/seed/shici-seed.json`)
 

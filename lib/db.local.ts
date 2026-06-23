@@ -12,7 +12,7 @@ import { exec, query, transaction } from './sqlite/client'
 import type { Row, SQLiteValue, StatementSpec } from './sqlite/worker'
 import {
   Text, Annotation, Sentence, RecitationQuestion,
-  MultiMeaning, Mistake, ShiciCard, VolumeId, TextType, AnnotationCategory, TextWithCounts
+  MultiMeaning, Mistake, PoemCard, VolumeId, TextType, AnnotationCategory, TextWithCounts
 } from './types'
 import { getNextReviewDate } from './constants'
 
@@ -134,7 +134,7 @@ function rowToMistake(row: Row): Mistake {
   }
 }
 
-function rowToShiciCard(row: Row): ShiciCard {
+function rowToPoemCard(row: Row): PoemCard {
   return {
     id: row.id as string,
     character: row.character as string,
@@ -345,14 +345,14 @@ export async function getMultiMeanings(character: string): Promise<MultiMeaning[
   return rows.map(rowToMultiMeaning)
 }
 
-// --- ShiciCards ---
-export async function getShiciCards(character: string): Promise<ShiciCard[]> {
-  const rows = await query('SELECT * FROM shici_cards WHERE character = ? ORDER BY created_at ASC', [character])
-  return rows.map(rowToShiciCard)
+// --- PoemCards ---
+export async function getPoemCards(character: string): Promise<PoemCard[]> {
+  const rows = await query('SELECT * FROM poem_cards WHERE character = ? ORDER BY created_at ASC', [character])
+  return rows.map(rowToPoemCard)
 }
 
-export async function getAllShiciCharacters(): Promise<string[]> {
-  const rows = await query('SELECT character, created_at FROM shici_cards ORDER BY created_at ASC')
+export async function getAllPoemCharacters(): Promise<string[]> {
+  const rows = await query('SELECT character, created_at FROM poem_cards ORDER BY created_at ASC')
   const seen = new Set<string>()
   const chars: string[] = []
   for (const row of rows) {
@@ -365,15 +365,15 @@ export async function getAllShiciCharacters(): Promise<string[]> {
   return chars
 }
 
-export async function importShiciCards(cards: Omit<ShiciCard, 'id' | 'createdAt'>[]): Promise<{ success: number; skipped: number }> {
-  const existing = await query('SELECT character, example FROM shici_cards')
+export async function importPoemCards(cards: Omit<PoemCard, 'id' | 'createdAt'>[]): Promise<{ success: number; skipped: number }> {
+  const existing = await query('SELECT character, example FROM poem_cards')
   const existingKeys = new Set(existing.map((r) => `${r.character}||${r.example}`))
 
   const toInsert = cards.filter(c => !existingKeys.has(`${c.character}||${c.example}`))
   if (toInsert.length === 0) return { success: 0, skipped: cards.length }
 
   const statements: StatementSpec[] = toInsert.map((c) => ({
-    sql: `INSERT INTO shici_cards (id, character, seq, pinyin, etymology, pos, meaning, example, source, sentence_meaning, created_at)
+    sql: `INSERT INTO poem_cards (id, character, seq, pinyin, etymology, pos, meaning, example, source, sentence_meaning, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     params: [newId(), c.character, 0, c.pinyin, c.etymology, c.pos, c.meaning, c.example, c.source, c.sentenceMeaning, nowIso()],
   }))
@@ -402,7 +402,7 @@ export async function getMistakes(filters?: {
     FROM mistakes m
     LEFT JOIN annotations a ON m.question_type = 'annotation' AND m.reference_id = a.id
     LEFT JOIN texts t ON a.text_id = t.id
-    LEFT JOIN shici_cards sc ON m.question_type = 'shici' AND m.reference_id = sc.id
+    LEFT JOIN poem_cards sc ON m.question_type = 'shici' AND m.reference_id = sc.id
     ${where}
     ORDER BY m.created_at DESC
   `, params)
@@ -531,7 +531,7 @@ export interface DataBackup {
     mistakes: Row[]
     shiciWords: Row[]
     shiciSenses: Row[]
-    shiciCards: Row[]
+    poemCards: Row[]
     meta: Row[]
   }
 }
@@ -549,7 +549,7 @@ const BACKUP_TABLES: Array<{ key: keyof DataBackup['tables']; table: string }> =
   { key: 'mistakes', table: 'mistakes' },
   { key: 'shiciWords', table: 'shici_words' },
   { key: 'shiciSenses', table: 'shici_senses' },
-  { key: 'shiciCards', table: 'shici_cards' },
+  { key: 'poemCards', table: 'poem_cards' },
 ]
 
 export async function exportAllData(): Promise<DataBackup> {

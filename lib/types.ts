@@ -64,7 +64,7 @@ export interface MultiMeaning {
   usage: string
 }
 
-export interface ShiciCard {
+export interface PoemCard {
   id: string
   character: string
   pinyin: string

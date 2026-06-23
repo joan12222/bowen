@@ -8,7 +8,7 @@
 // IMPORTANT: bump CACHE_VERSION on every release that changes any cached
 // asset (JS/CSS/HTML/icons/wasm) — this is what forces clients to fetch fresh
 // files instead of serving stale ones forever from cache-first.
-const CACHE_VERSION = "v4"
+const CACHE_VERSION = "v6"
 const CACHE_NAME = `bowen-${CACHE_VERSION}`
 
 // Small set of known-stable paths worth precaching eagerly on install. The

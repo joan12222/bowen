@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS mistakes (
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS shici_cards (
+CREATE TABLE IF NOT EXISTS poem_cards (
   id TEXT PRIMARY KEY,
   character TEXT NOT NULL,
   seq INTEGER NOT NULL DEFAULT 0,
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_shici_cards_character ON shici_cards(character);
+CREATE INDEX IF NOT EXISTS idx_poem_cards_character ON poem_cards(character);
 CREATE INDEX IF NOT EXISTS idx_annotations_text_id ON annotations(text_id);
 CREATE INDEX IF NOT EXISTS idx_annotations_category ON annotations(category);
 CREATE INDEX IF NOT EXISTS idx_sentences_text_id ON sentences(text_id);

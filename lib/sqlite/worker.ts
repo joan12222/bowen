@@ -145,6 +145,7 @@ async function init() {
     await openDatabase(true)
   }
 
+  await run('ALTER TABLE shici_cards RENAME TO poem_cards').catch(() => {})
   await sqlite3.exec(db, SQLITE_SCHEMA)
 
   const contentVersion = await getMetaVersion('seed_version')
