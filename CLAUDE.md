@@ -49,7 +49,7 @@ Cache-first 策略。每次发布涉及任何被缓存资源（页面、组件�
 
 Postgres→SQLite 类型映射：UUID→TEXT、BOOLEAN→INTEGER（0/1）、数组/JSONB→JSON TEXT。`db.local.ts` 中的行转换器负责类型转换。
 
-核心表：`texts`、`annotations`、`sentences`、`recitation_questions`、`mistakes`、`shici_cards`、`shici_words/senses`、`meta`。
+核心表：`texts`、`annotations`、`sentences`、`recitation_questions`、`mistakes`、`shici_words`、`shici_senses`、`meta`。
 
 ### 版本号说明
 
