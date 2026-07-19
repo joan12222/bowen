@@ -1,67 +1,47 @@
 'use client'
 import { useState } from 'react'
-import { addMistake } from '@/lib/db.local'
+import type { ExampleQuestion } from '@/lib/shici-practice'
 
-function generateQuestion(word: any, senses: any[]) {
-  const sense = senses[Math.floor(Math.random() * senses.length)]
-  const ex = sense.examples[Math.floor(Math.random() * sense.examples.length)]
-  const others = senses
-    .filter(s => s.meaning !== sense.meaning)
-    .map(s => s.meaning)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3)
-  return {
-    question: `"${ex.sentence}"（${ex.source}）中，"${word.word}"的意思是：`,
-    options: [...others, sense.meaning].sort(() => Math.random() - 0.5),
-    answer: sense.meaning,
-    senseId: sense.id as string,
-    translation: ex.translation,
-    wordId: word.id as number,
-  }
-}
-
-export default function PracticeCard({ word, senses }: { word: any, senses: any[] }) {
-  const [q, setQ] = useState(() => generateQuestion(word, senses))
+// Controlled single-question card. The parent session owns the queue and all
+// side effects: `onAnswered(correct)` fires once when an option is chosen
+// (parent records mistakes / marks mastered), `onNext` advances the queue.
+// Parent should mount with a per-question `key` so state resets between items.
+export default function PracticeCard({
+  question,
+  onAnswered,
+  onNext,
+  nextLabel = '下一题',
+}: {
+  question: ExampleQuestion
+  onAnswered: (correct: boolean, userAnswer: string) => void
+  onNext: () => void
+  nextLabel?: string
+}) {
   const [selected, setSelected] = useState<string | null>(null)
-  const [score, setScore] = useState({ correct: 0, total: 0 })
 
-  if (senses.length < 2) {
-    return (
-      <div className="max-w-xl mx-auto p-6 text-center text-gray-500">
-        该词义项不足，无法生成选择题。
-      </div>
-    )
-  }
-
-  const handleSelect = async (opt: string) => {
+  const handleSelect = (opt: string) => {
     if (selected) return
     setSelected(opt)
-    const correct = opt === q.answer
-    setScore(s => ({ correct: s.correct + (correct ? 1 : 0), total: s.total + 1 }))
-
-    if (!correct) {
-      await addMistake({
-        questionType: 'shici',
-        referenceId: q.senseId,
-        userAnswer: opt,
-        correctAnswer: q.answer,
-      })
-    }
+    onAnswered(opt === question.answer, opt)
   }
 
   return (
     <div className="max-w-xl mx-auto p-6">
-      <div className="text-sm text-gray-500 mb-4">得分：{score.correct} / {score.total}</div>
-      <p className="text-base mb-6 leading-relaxed">{q.question}</p>
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {q.options.map(opt => (
+      <p className="text-base mb-1 leading-relaxed">
+        「{question.word.word}」在下句中的意思是:
+      </p>
+      <p className="text-base mb-1 leading-relaxed font-serif">{question.sentence}</p>
+      <p className="text-xs text-gray-400 mb-5">{question.source}</p>
+
+      <div className="flex flex-col gap-2 mb-6">
+        {question.options.map((opt) => (
           <button
             key={opt}
             onClick={() => handleSelect(opt)}
             className={`p-3 rounded-xl border text-sm text-left transition-colors active:opacity-80 ${
               !selected
                 ? 'border-gray-200 hover:border-red-400 hover:bg-red-50'
-                : opt === q.answer
+                : opt === question.answer
                 ? 'border-green-500 bg-green-50 text-green-800'
                 : opt === selected
                 ? 'border-red-500 bg-red-50 text-red-800'
@@ -72,17 +52,18 @@ export default function PracticeCard({ word, senses }: { word: any, senses: any[
           </button>
         ))}
       </div>
+
       {selected && (
         <div className="bg-gray-50 rounded-xl p-4 text-sm">
           <p className="font-medium mb-1">
-            {selected === q.answer ? '✓ 正确！' : `✗ 正确答案：${q.answer}`}
+            {selected === question.answer ? '✓ 正确！' : `✗ 正确答案：${question.answer}`}
           </p>
-          <p className="text-gray-600 leading-relaxed">{q.translation}</p>
+          <p className="text-gray-600 leading-relaxed">{question.translation}</p>
           <button
-            onClick={() => { setSelected(null); setQ(generateQuestion(word, senses)) }}
+            onClick={onNext}
             className="mt-3 bg-red-700 text-white px-3 py-1.5 rounded-lg text-xs active:opacity-80"
           >
-            下一题
+            {nextLabel}
           </button>
         </div>
       )}

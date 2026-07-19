@@ -24,20 +24,12 @@ export default function ShiciListPage() {
     <div className="max-w-4xl mx-auto px-4 pt-4 pb-24">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-xl font-bold">实词 300</h1>
-        <div className="flex gap-2">
-          <Link
-            href="/shici/import"
-            className="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg active:opacity-80"
-          >
-            导入
-          </Link>
-          <Link
-            href="/shici/practice"
-            className="text-xs bg-red-700 text-white px-3 py-1.5 rounded-lg active:opacity-80"
-          >
-            随机练习
-          </Link>
-        </div>
+        <Link
+          href="/shici/import"
+          className="text-xs text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg active:opacity-80"
+        >
+          导入
+        </Link>
       </div>
 
       {words.length === 0 ? (

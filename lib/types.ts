@@ -64,19 +64,6 @@ export interface MultiMeaning {
   usage: string
 }
 
-export interface PoemCard {
-  id: string
-  character: string
-  pinyin: string
-  etymology: string
-  pos: string
-  meaning: string
-  example: string
-  source: string
-  sentenceMeaning: string
-  createdAt: Date
-}
-
 export interface Mistake {
   id: string
   questionType: 'annotation' | 'translation' | 'recitation' | 'multiMeaning' | 'shici'

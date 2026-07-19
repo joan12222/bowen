@@ -1,13 +1,12 @@
 // First-launch (and incremental) seeding of builtin content, fetched at
-// runtime from the static JSON snapshots in public/seed/ (see
-// scripts/export-builtin-data.mjs for how they were produced from Supabase).
+// runtime from the static JSON snapshots in public/seed/.
 //
 // Two independent seed tracks, each gated by its own meta.* version key:
 //   - builtin-content.json -> texts/annotations/sentences/recitation_questions/
 //     multi_meanings, seeded eagerly during worker init (small enough, and the
 //     app is unusable without it)
-//   - shici-seed.json -> shici_words/shici_senses/poem_cards (~300 entries,
-//     ~1.2MB), seeded lazily on first visit to /shici (see seedShiciIfNeeded)
+//   - shici-seed.json -> shici_words/shici_senses (~300 entries, ~1.2MB),
+//     seeded lazily on first visit to /shici (see seedShiciIfNeeded)
 //
 // Both use INSERT OR IGNORE keyed on primary key, so re-running after a seed
 // version bump only adds new builtin rows — it never overwrites rows the user
@@ -105,7 +104,6 @@ export async function seedBuiltinContentIfNeeded(db: SeedRunner, currentVersion:
 }
 
 interface ShiciSeed {
-  poemCards: any[]
   shiciWords: any[]
   shiciSenses: any[]
 }
@@ -127,14 +125,6 @@ export async function seedShiciIfNeeded(db: SeedRunner, currentVersion: number):
     statements.push({
       sql: `INSERT OR IGNORE INTO shici_senses (id, word_id, pos, meaning, sense_order, examples) VALUES (?, ?, ?, ?, ?, ?)`,
       params: [s.id, s.word_id, s.pos, s.meaning, s.sense_order, toJson(s.examples)],
-    })
-  }
-
-  for (const c of seed.poemCards) {
-    statements.push({
-      sql: `INSERT OR IGNORE INTO poem_cards (id, character, seq, pinyin, etymology, pos, meaning, example, source, sentence_meaning, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      params: [c.id, c.character, c.seq ?? 0, c.pinyin ?? '', c.etymology ?? '', c.pos ?? '', c.meaning, c.example, c.source ?? '', c.sentence_meaning ?? '', c.created_at],
     })
   }
 

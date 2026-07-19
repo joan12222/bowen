@@ -12,7 +12,7 @@ import { exec, query, transaction } from './sqlite/client'
 import type { Row, SQLiteValue, StatementSpec } from './sqlite/worker'
 import {
   Text, Annotation, Sentence, RecitationQuestion,
-  MultiMeaning, Mistake, PoemCard, VolumeId, TextType, AnnotationCategory, TextWithCounts
+  MultiMeaning, Mistake, VolumeId, TextType, AnnotationCategory, TextWithCounts
 } from './types'
 import { getNextReviewDate } from './constants'
 
@@ -115,6 +115,13 @@ function rowToMultiMeaning(row: Row): MultiMeaning {
 }
 
 function rowToMistake(row: Row): Mistake {
+  // referenceId for shici mistakes is `${senseId}#${exampleIndex}` — pick the
+  // exact example the user got wrong (no `#` on legacy rows → first example).
+  const refId = (row.reference_id as string) || ''
+  const hash = refId.indexOf('#')
+  const exIdx = hash >= 0 ? Number(refId.slice(hash + 1)) || 0 : 0
+  const examples = parseJsonArray(row.shici_examples) as unknown as { sentence?: string; source?: string }[]
+  const shiciEx = examples[exIdx] || examples[0]
   return {
     id: row.id as string,
     questionType: row.question_type as Mistake['questionType'],
@@ -129,23 +136,8 @@ function rowToMistake(row: Row): Mistake {
     annContext: (row.ann_context as string) || undefined,
     annTextTitle: (row.ann_text_title as string) || undefined,
     shiciCharacter: (row.shici_character as string) || undefined,
-    shiciExample: (row.shici_example as string) || undefined,
-    shiciSource: (row.shici_source as string) || undefined,
-  }
-}
-
-function rowToPoemCard(row: Row): PoemCard {
-  return {
-    id: row.id as string,
-    character: row.character as string,
-    pinyin: row.pinyin as string,
-    etymology: row.etymology as string,
-    pos: row.pos as string,
-    meaning: row.meaning as string,
-    example: row.example as string,
-    source: row.source as string,
-    sentenceMeaning: row.sentence_meaning as string,
-    createdAt: new Date(row.created_at as string),
+    shiciExample: shiciEx?.sentence || undefined,
+    shiciSource: shiciEx?.source || undefined,
   }
 }
 
@@ -345,42 +337,6 @@ export async function getMultiMeanings(character: string): Promise<MultiMeaning[
   return rows.map(rowToMultiMeaning)
 }
 
-// --- PoemCards ---
-export async function getPoemCards(character: string): Promise<PoemCard[]> {
-  const rows = await query('SELECT * FROM poem_cards WHERE character = ? ORDER BY created_at ASC', [character])
-  return rows.map(rowToPoemCard)
-}
-
-export async function getAllPoemCharacters(): Promise<string[]> {
-  const rows = await query('SELECT character, created_at FROM poem_cards ORDER BY created_at ASC')
-  const seen = new Set<string>()
-  const chars: string[] = []
-  for (const row of rows) {
-    const character = row.character as string
-    if (!seen.has(character)) {
-      seen.add(character)
-      chars.push(character)
-    }
-  }
-  return chars
-}
-
-export async function importPoemCards(cards: Omit<PoemCard, 'id' | 'createdAt'>[]): Promise<{ success: number; skipped: number }> {
-  const existing = await query('SELECT character, example FROM poem_cards')
-  const existingKeys = new Set(existing.map((r) => `${r.character}||${r.example}`))
-
-  const toInsert = cards.filter(c => !existingKeys.has(`${c.character}||${c.example}`))
-  if (toInsert.length === 0) return { success: 0, skipped: cards.length }
-
-  const statements: StatementSpec[] = toInsert.map((c) => ({
-    sql: `INSERT INTO poem_cards (id, character, seq, pinyin, etymology, pos, meaning, example, source, sentence_meaning, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    params: [newId(), c.character, 0, c.pinyin, c.etymology, c.pos, c.meaning, c.example, c.source, c.sentenceMeaning, nowIso()],
-  }))
-  await transaction(statements)
-  return { success: toInsert.length, skipped: cards.length - toInsert.length }
-}
-
 // --- Mistakes ---
 export async function getMistakes(filters?: {
   questionType?: Mistake['questionType']
@@ -396,13 +352,16 @@ export async function getMistakes(filters?: {
       a.word AS ann_word,
       a.context AS ann_context,
       t.title AS ann_text_title,
-      sc.character AS shici_character,
-      sc.example AS shici_example,
-      sc.source AS shici_source
+      sw.word AS shici_character,
+      ss.examples AS shici_examples
     FROM mistakes m
     LEFT JOIN annotations a ON m.question_type = 'annotation' AND m.reference_id = a.id
     LEFT JOIN texts t ON a.text_id = t.id
-    LEFT JOIN poem_cards sc ON m.question_type = 'shici' AND m.reference_id = sc.id
+    LEFT JOIN shici_senses ss ON m.question_type = 'shici' AND ss.id =
+      CASE WHEN instr(m.reference_id, '#') > 0
+           THEN substr(m.reference_id, 1, instr(m.reference_id, '#') - 1)
+           ELSE m.reference_id END
+    LEFT JOIN shici_words sw ON ss.word_id = sw.id
     ${where}
     ORDER BY m.created_at DESC
   `, params)
@@ -531,7 +490,6 @@ export interface DataBackup {
     mistakes: Row[]
     shiciWords: Row[]
     shiciSenses: Row[]
-    poemCards: Row[]
     meta: Row[]
   }
 }
@@ -549,7 +507,6 @@ const BACKUP_TABLES: Array<{ key: keyof DataBackup['tables']; table: string }> =
   { key: 'mistakes', table: 'mistakes' },
   { key: 'shiciWords', table: 'shici_words' },
   { key: 'shiciSenses', table: 'shici_senses' },
-  { key: 'poemCards', table: 'poem_cards' },
 ]
 
 export async function exportAllData(): Promise<DataBackup> {

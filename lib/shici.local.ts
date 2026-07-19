@@ -5,6 +5,7 @@
 
 import { query, seedShici } from './sqlite/client'
 import type { Row } from './sqlite/worker'
+import { buildExampleQuestion, parseExampleRef, type ExampleQuestion } from './shici-practice'
 
 export async function getShiciList() {
   // Lazily seeds the ~300-entry shici dataset on first visit to /shici,
@@ -28,15 +29,42 @@ export async function getShiciDetail(id: number) {
   return { word, senses }
 }
 
-export async function getRandomShiciWord() {
+export async function getAdjacentShiciIds(id: number) {
   await seedShici()
-  const countRows = await query('SELECT COUNT(*) AS count FROM shici_words')
-  const count = (countRows[0]?.count as number) || 0
-  if (!count) return null
+  const prev = await query('SELECT id FROM shici_words WHERE id < ? ORDER BY id DESC LIMIT 1', [id])
+  const next = await query('SELECT id FROM shici_words WHERE id > ? ORDER BY id ASC LIMIT 1', [id])
+  return { prevId: (prev[0]?.id as number) ?? null, nextId: (next[0]?.id as number) ?? null }
+}
 
-  const randomOffset = Math.floor(Math.random() * count)
-  const wordRows = await query('SELECT id FROM shici_words ORDER BY id LIMIT 1 OFFSET ?', [randomOffset])
-  const wordRow = wordRows[0]
-  if (!wordRow) return null
-  return getShiciDetail(wordRow.id as number)
+// Restores unmastered 实词 mistakes into replayable example questions for the
+// mistake-book redo mode (app/review/practice). Each mistake's referenceId
+// (`senseId#exampleIndex`) is resolved back to its word + all senses.
+export async function getShiciMistakeQuestions(char?: string): Promise<{ mistakeId: string; question: ExampleQuestion }[]> {
+  await seedShici()
+  const mistakes = await query(
+    "SELECT id, reference_id FROM mistakes WHERE question_type = 'shici' AND is_mastered = 0 ORDER BY created_at ASC"
+  )
+  if (!mistakes.length) return []
+
+  const detailCache = new Map<number, { word: Row | null; senses: any[] }>()
+  const result: { mistakeId: string; question: ExampleQuestion }[] = []
+
+  for (const m of mistakes) {
+    const { senseId, exampleIndex } = parseExampleRef(m.reference_id as string)
+    const senseRows = await query('SELECT word_id FROM shici_senses WHERE id = ?', [senseId])
+    const wordId = senseRows[0]?.word_id as number | undefined
+    if (wordId == null) continue
+
+    let detail = detailCache.get(wordId)
+    if (!detail) {
+      detail = await getShiciDetail(wordId)
+      detailCache.set(wordId, detail)
+    }
+    if (!detail.word) continue
+    if (char && detail.word.word !== char) continue // 按词过滤
+
+    const question = buildExampleQuestion(detail.word, detail.senses, senseId, exampleIndex)
+    if (question) result.push({ mistakeId: m.id as string, question })
+  }
+  return result
 }

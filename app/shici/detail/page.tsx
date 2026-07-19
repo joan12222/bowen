@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { getShiciDetail } from "@/lib/shici.local"
+import { getShiciDetail, getAdjacentShiciIds } from "@/lib/shici.local"
 import SenseTable from "@/components/shici/SenseTable"
 
 type ShiciDetail = Awaited<ReturnType<typeof getShiciDetail>>
@@ -21,14 +21,18 @@ function ShiciDetailContent() {
   const id = Number(idStr)
   const [word, setWord] = useState<ShiciDetail["word"]>(null)
   const [senses, setSenses] = useState<ShiciDetail["senses"]>([])
+  const [prevId, setPrevId] = useState<number | null>(null)
+  const [nextId, setNextId] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!id) return
-    getShiciDetail(id)
-      .then(({ word, senses }) => {
+    Promise.all([getShiciDetail(id), getAdjacentShiciIds(id)])
+      .then(([{ word, senses }, { prevId, nextId }]) => {
         setWord(word)
         setSenses(senses)
+        setPrevId(prevId)
+        setNextId(nextId)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -72,19 +76,23 @@ function ShiciDetailContent() {
       <SenseTable senses={senses} word={String(word.word)} />
 
       <div className="flex items-center justify-between mt-8 gap-3">
-        {id > 1 ? (
-          <Link href={`/shici/detail?id=${id - 1}`} className="text-sm bg-gray-100 px-3 py-2 rounded-lg active:opacity-80">
+        {prevId != null ? (
+          <Link href={`/shici/detail?id=${prevId}`} className="text-sm bg-gray-100 px-3 py-2 rounded-lg active:opacity-80">
             ← 上一个
           </Link>
         ) : <span />}
-        <Link
-          href={`/shici/practice?id=${id}`}
-          className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm active:opacity-80"
-        >
-          练习此词
-        </Link>
-        {id < 300 ? (
-          <Link href={`/shici/detail?id=${id + 1}`} className="text-sm bg-gray-100 px-3 py-2 rounded-lg active:opacity-80">
+        {senses.length >= 2 ? (
+          <Link
+            href={`/shici/practice?id=${id}`}
+            className="bg-red-700 text-white px-4 py-2 rounded-lg text-sm active:opacity-80"
+          >
+            练习此词
+          </Link>
+        ) : (
+          <span className="bg-gray-100 text-gray-400 px-4 py-2 rounded-lg text-sm">义项不足，无法练习</span>
+        )}
+        {nextId != null ? (
+          <Link href={`/shici/detail?id=${nextId}`} className="text-sm bg-gray-100 px-3 py-2 rounded-lg active:opacity-80">
             下一个 →
           </Link>
         ) : <span />}

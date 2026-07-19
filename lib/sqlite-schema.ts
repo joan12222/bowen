@@ -1,4 +1,4 @@
-// SQLite DDL converted from supabase/schema.sql.
+// SQLite DDL (converted from the original Postgres schema).
 // Postgres -> SQLite type mapping used here:
 //   UUID          -> TEXT (uuid generated in application code via the `uuid` package)
 //   TEXT[]        -> TEXT (JSON-encoded string array, JSON.parse/stringify in lib/db.ts)
@@ -81,20 +81,6 @@ CREATE TABLE IF NOT EXISTS mistakes (
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS poem_cards (
-  id TEXT PRIMARY KEY,
-  character TEXT NOT NULL,
-  seq INTEGER NOT NULL DEFAULT 0,
-  pinyin TEXT NOT NULL DEFAULT '',
-  etymology TEXT NOT NULL DEFAULT '',
-  pos TEXT NOT NULL DEFAULT '',
-  meaning TEXT NOT NULL,
-  example TEXT NOT NULL,
-  source TEXT NOT NULL DEFAULT '',
-  sentence_meaning TEXT NOT NULL DEFAULT '',
-  created_at TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS shici_words (
   id INTEGER PRIMARY KEY,
   word TEXT NOT NULL,
@@ -120,7 +106,6 @@ CREATE TABLE IF NOT EXISTS meta (
   value TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_poem_cards_character ON poem_cards(character);
 CREATE INDEX IF NOT EXISTS idx_annotations_text_id ON annotations(text_id);
 CREATE INDEX IF NOT EXISTS idx_annotations_category ON annotations(category);
 CREATE INDEX IF NOT EXISTS idx_sentences_text_id ON sentences(text_id);
