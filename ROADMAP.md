@@ -1,7 +1,7 @@
 # ROADMAP
 
 > 项目真实进度源。README 写介绍与用法,本文件写会变化的进度。
-> 最近更新:2026-07-20 · 当前版本 **1.4.1**(`CACHE_VERSION` v8)
+> 最近更新:2026-07-22 · 当前版本 **1.4.1**(`CACHE_VERSION` v8)
 
 ## 当前阶段
 
@@ -17,11 +17,15 @@
 - **统一数据模型**:彻底删除遗留 `poem_cards`(表 + 死代码 + 备份映射 + seed 轨道),实词数据收敛为 `shici_words`/`shici_senses` 一套;老用户 DB 的孤儿表在 worker init 时 `DROP`。
 - **修复**:练习卡换词不刷新(`key`);详情页上一/下一去除 `id<300` 硬编码,改按实际相邻 id。
 - **版本**:`package.json` 1.3.1→1.4.1、`CACHE_VERSION` v6→v8;版本经 `NEXT_PUBLIC_APP_VERSION` 注入设置页显示。
+- **wrangler 部署配置**(2026-07-22):新建 `wrangler.toml`(项目名 `bowen`、产物目录 `out`),`package.json` 加 `deploy` 脚本,wrangler `^4.112.0` 进 devDependencies。配置已就绪并确认 `wrangler --version` 可运行;**部署本身未执行**,端到端上线路径待验证。
 
 ## 待办
 
-- **部署**:`git push` 到 GitHub 即触发 Cloudflare Pages 自动构建上线(**push 本身即公开发布,红线,需明确授权**)。用户端重开应用即自动获取。
-- **提交**:本轮改动尚未 `git commit`(分支 `desktop-app`);根目录 `AGENTS.md` 未跟踪,待确认处理。
+- **部署**(两条路径,**均属公开发布红线,需明确授权**):
+  - Git 触发:`git push` 到 GitHub 即触发 Cloudflare Pages 云端构建上线,可按 commit 回滚。
+  - wrangler 直传(本轮新增):`npm run deploy`(= `next build` + `wrangler pages deploy`),本地构建后直传,首次需 `npx wrangler login`。项目名默认 `bowen`,若 Cloudflare 已有站点用别名需改 `wrangler.toml`。
+  - 用户端重开应用即自动获取(前提:发版清单已改 `CACHE_VERSION`/种子版本)。
+- **提交**:实词重构轮已 commit + push(远端 HEAD `fdaf9a5`);wrangler 部署配置本轮提交。根目录 `AGENTS.md` 未跟踪,待确认处理。
 
 ## 明确不做(已与用户确认)
 
